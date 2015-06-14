@@ -31,8 +31,8 @@ import parameter_editor
 
 def get_strokes():
     # a tuple containing all strokes from the current render. should get replaced by freestyle.context at some point
-    return tuple(map(Operators().get_stroke_from_index, range(Operators().get_strokes_size())))
 
+    return tuple(map(Operators().get_stroke_from_index, range(Operators().get_strokes_size())))
 # get the exact scene dimensions
 def render_height(scene):
     return int(scene.render.resolution_y * scene.render.resolution_percentage / 100)
@@ -158,6 +158,7 @@ def freestyle_to_gpencil_strokes(strokes, frame, pressure=1, draw_mode='3DSPACE'
 
         if draw_mode == '3DSPACE':
             for svert, point in zip(fstroke, gpstroke.points):
+                # svert.attribute.color = (1, 0, 0) # confirms that this callback runs earlier than the shading
                 point.co = mat * svert.point_3d
                 point.pressure = pressure
         elif draw_mode == 'SCREEN':
@@ -191,7 +192,7 @@ classes = (
     SVGExporterPanel,
     )
 
-def export_stroke(scene, layer, lineset):
+def export_stroke(scene, _, x):
     # create stroke layer
     freestyle_to_strokes(scene)
 
@@ -218,6 +219,8 @@ def register():
 
     parameter_editor.callbacks_lineset_pre.append(export_fill)
     parameter_editor.callbacks_lineset_post.append(export_stroke)
+    # bpy.app.handlers.render_post.append(export_stroke)
+    print("anew")
 
 def unregister():
 
