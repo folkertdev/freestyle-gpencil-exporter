@@ -1,0 +1,9 @@
+# ignore vim swap stuff 
+..*
+*.swp
+
+# atom jslint 
+.jslintrc
+
+# pycache
+__pycache__
