@@ -13,7 +13,7 @@ bl_info = {
     "name": "Freestyle to Grease Pencil",
     "author": "Folkert de Vries",
     "version": (1, 0),
-    "blender": (2, 72, 1),
+    "blender": (2, 74, 1),
     "location": "Properties > Render > Freestyle to Grease Pencil",
     "description": "Exports Freestyle's stylized to a Grease Pencil sketch",
     "warning": "",
@@ -30,11 +30,12 @@ import parameter_editor
 
 
 def get_strokes():
+    # a tuple containing all strokes from the current render. should get replaced by freestyle.context at some point
     return tuple(map(Operators().get_stroke_from_index, range(Operators().get_strokes_size())))
 
+# get the exact scene dimensions
 def render_height(scene):
     return int(scene.render.resolution_y * scene.render.resolution_percentage / 100)
-
 
 def render_width(scene):
     return int(scene.render.resolution_x * scene.render.resolution_percentage / 100)
@@ -44,7 +45,7 @@ def render_dimensions(scene):
 
 class FreestyleGPencil(bpy.types.PropertyGroup):
     """Implements the properties for the Freestyle to Grease Pencil exporter"""
-    bl_idname = "RENDER_PT_svg_export"
+    bl_idname = "RENDER_PT_gpencil_export"
 
     use_freestyle_gpencil_export = BoolProperty(
             name="Grease Pencil Export",
@@ -63,6 +64,11 @@ class FreestyleGPencil(bpy.types.PropertyGroup):
     use_fill = BoolProperty(
             name="Fill Contours",
             description="Fill the contour with the object's material color",
+            )
+    use_overwrite = BoolProperty(
+            name="Overwrite Result",
+            description="Remove the GPencil strokes from previous renders before a new render",
+            default=True,
             )
 
 
@@ -91,11 +97,13 @@ class SVGExporterPanel(bpy.types.Panel):
 
         row = layout.row()
         #row.prop(svg, "split_at_invisible")
-        row.prop(gp, "use_fill")
+        # row.prop(gp, "use_fill")
+        row.prop(gp, "use_overwrite")
 
 
 
 def render_visible_strokes():
+    """Renders the scene, selects visible strokes and returns them as a tuple"""
     upred = QuantitativeInvisibilityUP1D(0) # visible lines only
     #upred = TrueUP1D() # all lines
     Operators.select(upred)
@@ -104,17 +112,18 @@ def render_visible_strokes():
     return get_strokes()
 
 def render_external_contour():
+    """Renders the scene, selects visible strokes of the Contour nature and returns them as a tuple"""
     upred = AndUP1D(QuantitativeInvisibilityUP1D(0), ContourUP1D())
     Operators.select(upred)
     # chain when the same shape and visible
     bpred = SameShapeIdBP1D()
     Operators.bidirectional_chain(ChainPredicateIterator(upred, bpred), NotUP1D(upred))
     Operators.create(TrueUP1D(), [])
-    return tuple(map(Operators.get_stroke_from_index, range(Operators.get_strokes_size())))
+    return get_strokes()
 
 
 def create_gpencil_layer(scene, name, color, alpha, fill_color, fill_alpha):
-
+    """Creates a new GPencil layer (if needed) to store the Freestyle result"""
     gp = bpy.data.grease_pencil.get("FreestyleGPencil", False) or bpy.data.grease_pencil.new(name="FreestyleGPencil")
     scene.grease_pencil = gp
     layer = gp.layers.get(name, False)
@@ -126,15 +135,20 @@ def create_gpencil_layer(scene, name, color, alpha, fill_color, fill_alpha):
         layer.fill_alpha = fill_alpha
         layer.alpha = alpha 
         layer.color = color
+    elif scene.freestyle_gpencil_export.use_overwrite:
+        # empty the current strokes from the gp layer
+        layer.clear()
 
     # can this be done more neatly? layer.frames.get(..., ...) doesn't seem to work
     frame = frame_from_frame_number(layer, scene.frame_current) or layer.frames.new(scene.frame_current)
     return layer, frame 
 
 def frame_from_frame_number(layer, current_frame):
+    """Get a reference to the current frame if it exists, else False"""
     return next((frame for frame in layer.frames if frame.frame_number == current_frame), False)
 
 def freestyle_to_gpencil_strokes(strokes, frame, pressure=1, draw_mode='3DSPACE'):
+    """Actually creates the GPencil structure from a collection of strokes"""
     mat = bpy.context.scene.camera.matrix_local.copy()
     for fstroke in strokes:
         gpstroke = frame.strokes.new()
