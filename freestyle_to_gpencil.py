@@ -8,6 +8,8 @@ import bpy
 from bpy_extras import view3d_utils
 import bpy_extras
 from mathutils import Vector, Matrix
+import functools
+import collections
 
 bl_info = {
     "name": "Freestyle to Grease Pencil",
@@ -101,6 +103,34 @@ class SVGExporterPanel(bpy.types.Panel):
         row.prop(gp, "use_overwrite")
 
 
+class FSGPExporterLinesetPanel(bpy.types.Panel):
+    """Creates a Panel in the Render Layers context of the properties editor"""
+    bl_idname = "RENDER_PT_FSGPExporterLinesetPanel"
+    bl_space_type = 'PROPERTIES'
+    bl_label = "Freestyle Line Style Grease Pencil Export"
+    bl_region_type = 'WINDOW'
+    bl_context = "render_layer"
+
+    def draw(self, context):
+        layout = self.layout
+
+        scene = context.scene
+        gp = scene.freestyle_gpencil_export
+        freestyle = scene.render.layers.active.freestyle_settings
+        linestyle = freestyle.linesets.active.linestyle
+
+        layout.active = (gp.use_freestyle_gpencil_export and freestyle.mode != 'SCRIPT')
+
+        row = layout.row()
+        column = row.column()
+        column.prop(linestyle, 'use_extract_thickness')
+
+        column = row.column()
+        column.prop(linestyle, 'use_extract_alpha')
+
+        row = layout.row()
+        row.prop(linestyle, "extract_color", expand=True)
+
 
 def render_visible_strokes():
     """Renders the scene, selects visible strokes and returns them as a tuple"""
@@ -130,11 +160,6 @@ def create_gpencil_layer(scene, name, color, alpha, fill_color, fill_alpha):
     if not layer:
         print("making new GPencil layer")
         layer = gp.layers.new(name=name, set_active=True)
-        # set defaults
-        layer.fill_color = fill_color
-        layer.fill_alpha = fill_alpha
-        layer.alpha = alpha 
-        layer.color = color
     elif scene.freestyle_gpencil_export.use_overwrite:
         # empty the current strokes from the gp layer
         layer.clear()
@@ -147,54 +172,128 @@ def frame_from_frame_number(layer, current_frame):
     """Get a reference to the current frame if it exists, else False"""
     return next((frame for frame in layer.frames if frame.frame_number == current_frame), False)
 
-def freestyle_to_gpencil_strokes(strokes, frame, pressure=1, draw_mode='3DSPACE'):
-    """Actually creates the GPencil structure from a collection of strokes"""
-    mat = bpy.context.scene.camera.matrix_local.copy()
-    for fstroke in strokes:
-        gpstroke = frame.strokes.new()
-        # enum in ('SCREEN', '3DSPACE', '2DSPACE', '2DIMAGE')
-        gpstroke.draw_mode = draw_mode
-        gpstroke.points.add(count=len(fstroke))
+def rgb_to_hex(rgb):
+    """Used to compare by hex. loses some precision, which is exactly what we want"""
+    return '#%02x%02x%02x' % rgb
 
-        if draw_mode == '3DSPACE':
-            for svert, point in zip(fstroke, gpstroke.points):
-                # svert.attribute.color = (1, 0, 0) # confirms that this callback runs earlier than the shading
+def color_to_hex(color):
+    return rgb_to_hex(tuple(int(v) for v in (color.r, color.g, color.b)))
+
+
+def get_colorname(cache, key, palette, name="FSGPencilColor"):
+    code = color_to_hex(key)
+    try:
+        color = cache[code]
+
+    except KeyError:
+        color = palette.colors.new()
+        color.name = name
+        color.color = key
+        color.alpha = 1.0
+        cache[code] = color
+
+    return (cache, color.name)
+
+
+DrawOptions = collections.namedtuple('DrawOptions', 'draw_mode color_extraction thickness_extraction alpha_extraction')
+
+def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode='3DSPACE', color_extraction='BASE'):
+    mat = bpy.context.scene.camera.matrix_local.copy()
+    palette = bpy.context.scene.grease_pencil.palettes.active 
+
+    # can we tag the colors the script adds, to remove them when they are not used? 
+    cache = dict()
+    for color in palette.colors:
+        # setattr(color.__class__, 'fsgpexporter', False)
+        # color.fsgpexporter = True
+        if color.fsgpexporter:
+            cache[color_to_hex(color.color)] = color
+
+    used = []
+
+    for fstroke in strokes:
+
+        if options.color_extraction == 'FIRST':
+            base_color = fstroke[0].attribute.color
+        elif options.color_extraction == 'FINAL':
+            base_color = fstroke[-1].attribute.color
+        else:
+            base_color = lineset.linestyle.color
+
+        base_color.freeze()
+        (cache, colorname) = get_colorname(cache, base_color, palette) 
+        gpstroke = frame.strokes.new(colorname=colorname)
+        gpstroke.draw_mode = options.draw_mode
+        used.append(colorname)
+
+        gpstroke.points.add(count=len(fstroke), pressure=1, strength=1)
+
+        base_width = functools.reduce(max, (sum(svert.attribute.thickness) for svert in fstroke)) 
+        gpstroke.line_width = base_width 
+
+
+
+
+        if options.draw_mode == '3DSPACE':
+            for svert, point in zip (fstroke, gpstroke.points):
                 point.co = mat * svert.point_3d
-                point.pressure = pressure
-        elif draw_mode == 'SCREEN':
+
+                if options.thickness_extraction:
+                    point.pressure = sum(svert.attribute.thickness) / max(1e-6, base_width)
+
+                if options.alpha_extraction:
+                    point.strength = svert.attribute.alpha
+
+        elif options.draw_mode == 'SCREEN':
+            gpstroke.draw_mode = '2DSPACE'
             width, height = render_dimensions(bpy.context.scene)
-            for svert, point in zip(fstroke, gpstroke.points):
+            for svert, point in zip (fstroke, gpstroke.points):
                 x, y = svert.point
                 point.co = Vector((abs(x / width), abs(y / height), 0.0)) * 100
-                point.pressure = 1
+                point.strength = svert.attribute.alpha
+
         else:
             raise NotImplementedError()
 
+        for color in palette.colors:
+            if color.name not in used:
+                palette.colors.remove(color)
 
-def freestyle_to_fill(scene):
+
+def freestyle_to_fill(scene, lineset):
     default = dict(color=(0, 0, 0), alpha=1, fill_color=(0, 1, 0), fill_alpha=1)
-    layer, frame = create_gpencil_layer(scene, "freestyle fill", **default)
+    layer, frame = create_gpencil_layer(scene, "FF " + lineset.name, **default)
     # render the external contour 
     strokes = render_external_contour()
-    freestyle_to_gpencil_strokes(strokes, frame, draw_mode=scene.freestyle_gpencil_export.draw_mode)
+    freestyle_to_gpencil_strokes(strokes, frame, lineset, draw_mode=scene.freestyle_gpencil_export.draw_mode)
 
-def freestyle_to_strokes(scene):
+def freestyle_to_strokes(scene, lineset):
     default = dict(color=(0, 0, 0), alpha=1, fill_color=(0, 1, 0), fill_alpha=0)
-    layer, frame = create_gpencil_layer(scene, "freestyle stroke", **default)
+    layer, frame = create_gpencil_layer(scene, "FS " + lineset.name, **default)
     # render the normal strokes 
     #strokes = render_visible_strokes()
     strokes = get_strokes()
-    freestyle_to_gpencil_strokes(strokes, frame, draw_mode=scene.freestyle_gpencil_export.draw_mode)
+
+    exporter = scene.freestyle_gpencil_export
+    linestyle = lineset.linestyle
+
+    options = DrawOptions(draw_mode= exporter.draw_mode
+            , color_extraction = linestyle.extract_color
+            , alpha_extraction = linestyle.use_extract_alpha
+            , thickness_extraction = linestyle.use_extract_thickness
+            )
+    freestyle_to_gpencil_strokes(strokes, frame, lineset, options)
 
 
 classes = (
     FreestyleGPencil,
     SVGExporterPanel,
+    FSGPExporterLinesetPanel,
     )
 
-def export_stroke(scene, _, x):
+def export_stroke(scene, _, lineset):
     # create stroke layer
-    freestyle_to_strokes(scene)
+    freestyle_to_strokes(scene, lineset)
 
 def export_fill(scene, layer, lineset):
     # Doesn't work for 3D due to concave edges
@@ -213,6 +312,34 @@ def export_fill(scene, layer, lineset):
 
 def register():
 
+
+    linestyle = bpy.types.FreestyleLineStyle
+    linestyle.use_extract_thickness = BoolProperty(
+            name="Extract Thickness",
+            description="Apply Freestyle thickness values to Grease Pencil strokes",
+            default=True,
+            )
+    linestyle.use_extract_alpha = BoolProperty(
+            name="Extract Alpha",
+            description="Apply Freestyle alpha values to Grease Pencil strokes",
+            default=True,
+            )
+    linestyle.extract_color= EnumProperty(
+            name="Stroke Color Mode",
+            items=(
+                ('NONE', "None", "Don't extract color"),
+                ('BASE', "Base Color", "Use the linestyle's base color"),
+                ('FIRST', "First Vertex", "Use the color of a stroke's first vertex"),
+                ('FINAL', "Final Vertex", "Use the color of a stroke's final vertex"),
+                ),
+            default='BASE'
+            )
+
+
+    bpy.types.GPencilPaletteColor.fsgpexporter = BoolProperty(name="Onwed by FSGPExporter"
+            , description="Was this color created by the freestyle gpencil exporter?"
+            , default=False)
+
     for cls in classes:
         bpy.utils.register_class(cls)
     bpy.types.Scene.freestyle_gpencil_export = PointerProperty(type=FreestyleGPencil)
@@ -220,13 +347,17 @@ def register():
     parameter_editor.callbacks_lineset_pre.append(export_fill)
     parameter_editor.callbacks_lineset_post.append(export_stroke)
     # bpy.app.handlers.render_post.append(export_stroke)
-    print("anew")
 
 def unregister():
 
     for cls in classes:
         bpy.utils.unregister_class(cls)
     del bpy.types.Scene.freestyle_gpencil_export
+    del bpy.types.GPencilPaletteColor.fsgpexporter
+
+    del linestyle.use_extract_thickness
+    del linestyle.use_extract_alpha
+    del linestyle.extract_color
 
     parameter_editor.callbacks_lineset_pre.append(export_fill)
     parameter_editor.callbacks_lineset_post.remove(export_stroke)
