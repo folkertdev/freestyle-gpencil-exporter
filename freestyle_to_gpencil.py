@@ -33,19 +33,26 @@ from bpy.props import (
 import parameter_editor
 
 
+DrawOptions = collections.namedtuple('DrawOptions', 'draw_mode color_extraction color_extraction_mode thickness_extraction alpha_extraction')
+
+
 def get_strokes():
     # a tuple containing all strokes from the current render. should get replaced by freestyle.context at some point
-
     return tuple(map(Operators().get_stroke_from_index, range(Operators().get_strokes_size())))
+
+
 # get the exact scene dimensions
 def render_height(scene):
     return int(scene.render.resolution_y * scene.render.resolution_percentage / 100)
 
+
 def render_width(scene):
     return int(scene.render.resolution_x * scene.render.resolution_percentage / 100)
 
+
 def render_dimensions(scene):
     return render_width(scene), render_height(scene)
+
 
 class FreestyleGPencil(bpy.types.PropertyGroup):
     """Implements the properties for the Freestyle to Grease Pencil exporter"""
@@ -64,10 +71,6 @@ class FreestyleGPencil(bpy.types.PropertyGroup):
                 ('SCREEN', "Screen", "", 3),
                 ),
             default='3DSPACE',
-            )
-    use_fill = BoolProperty(
-            name="Fill Contours",
-            description="Fill the contour with the object's material color",
             )
     write_mode = EnumProperty(
             name="Write Mode",
@@ -125,15 +128,19 @@ class FSGPExporterLinesetPanel(bpy.types.Panel):
 
         layout.active = (gp.use_freestyle_gpencil_export and freestyle.mode != 'SCRIPT')
 
-        row = layout.row()
-        column = row.column()
-        column.prop(linestyle, 'use_extract_thickness')
+        col = layout.column()
+        col.label(text="Extract Freestyle Settings:")
+        row = col.row(align=True)
+        row.prop(linestyle, "use_extract_color", text="Stroke Color", toggle=True)
+        # row.prop(linestyle, "use_extract_fill", text="Fill Color", toggle=True)
+        row.prop(linestyle, "use_extract_thickness", text="Thickness", toggle=True)
+        row.prop(linestyle, "use_extract_alpha", text="Alpha", toggle=True)
 
-        column = row.column()
-        column.prop(linestyle, 'use_extract_alpha')
-
-        row = layout.row()
-        row.prop(linestyle, "extract_color", expand=True)
+        if linestyle.use_extract_color:
+            row = layout.row()
+            row.label(text="Color Extraction Mode:")
+            row = layout.row()
+            row.prop(linestyle, "extract_color", expand=True)
 
 
 def render_visible_strokes():
@@ -200,6 +207,16 @@ def color_to_hex(color):
     return rgb_to_hex(tuple(int(v) for v in (color.r, color.g, color.b)))
 
 
+def diffuse_from_stroke(stroke, curvemat=CurveMaterialF0D()):
+    material = curvemat(Interface0DIterator(stroke))
+    return material.diffuse
+
+
+def get_fill_color(stroke):
+    *color, alpha = diffuse_from_stroke(stroke)
+    color = tuple(int(255 * c) for c in color)
+
+
 def get_colorname(cache, key, palette, name="FSGPencilColor"):
     code = color_to_hex(key)
     try:
@@ -215,9 +232,6 @@ def get_colorname(cache, key, palette, name="FSGPencilColor"):
     return (cache, color.name)
 
 
-
-DrawOptions = collections.namedtuple('DrawOptions', 'draw_mode color_extraction thickness_extraction alpha_extraction')
-
 def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode='3DSPACE', color_extraction='BASE'):
     mat = bpy.context.scene.camera.matrix_local.copy()
 
@@ -231,15 +245,17 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
     # keep track of which colors are used (to remove unused ones)
     used = []
 
-
     for fstroke in strokes:
 
-        if options.color_extraction == 'FIRST':
-            base_color = fstroke[0].attribute.color
-        elif options.color_extraction == 'FINAL':
-            base_color = fstroke[-1].attribute.color
-        else:
-            base_color = lineset.linestyle.color
+        if options.color_extraction:
+            if options.color_extraction_mode == 'FIRST':
+                base_color = fstroke[0].attribute.color
+            elif options.color_extraction_mode == 'FINAL':
+                base_color = fstroke[-1].attribute.color
+            else:
+                base_color = lineset.linestyle.color
+
+
 
         # color has to be frozen (immutable) for it to be stored
         base_color.freeze()
@@ -286,13 +302,6 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
             palette.colors.remove(color)
 
 
-def freestyle_to_fill(scene, lineset):
-    default = dict(color=(0, 0, 0), alpha=1, fill_color=(0, 1, 0), fill_alpha=1)
-    layer, frame = create_gpencil_layer(scene, "FF " + lineset.name, **default)
-    # render the external contour 
-    strokes = render_external_contour()
-    freestyle_to_gpencil_strokes(strokes, frame, lineset, draw_mode=scene.freestyle_gpencil_export.draw_mode)
-
 def freestyle_to_strokes(scene, lineset):
     default = dict(color=(0, 0, 0), alpha=1, fill_color=(0, 1, 0), fill_alpha=0)
 
@@ -307,7 +316,8 @@ def freestyle_to_strokes(scene, lineset):
     linestyle = lineset.linestyle
 
     options = DrawOptions(draw_mode= exporter.draw_mode
-            , color_extraction = linestyle.extract_color
+            , color_extraction = linestyle.use_extract_color
+            , color_extraction_mode = linestyle.extract_color
             , alpha_extraction = linestyle.use_extract_alpha
             , thickness_extraction = linestyle.use_extract_thickness
             )
@@ -320,43 +330,39 @@ classes = (
     FSGPExporterLinesetPanel,
     )
 
+
 def export_stroke(scene, _, lineset):
     # create stroke layer
     freestyle_to_strokes(scene, lineset)
 
-def export_fill(scene, layer, lineset):
-    # Doesn't work for 3D due to concave edges
-    return
-
-    #if not scene.freestyle_gpencil_export.use_freestyle_gpencil_export:
-    #    return 
-
-    #if scene.freestyle_gpencil_export.use_fill:
-    #    # create the fill layer
-    #    freestyle_to_fill(scene)
-    #    # delete these strokes
-    #    Operators.reset(delete_strokes=True)
-
-
 
 def register():
-
-
     linestyle = bpy.types.FreestyleLineStyle
+
+    linestyle.use_extract_color = BoolProperty(
+            name="Extract Stroke Color",
+            description="Apply Freestyle stroke color to Grease Pencil strokes",
+            default=True,
+            )
+    linestyle.use_extract_fill = BoolProperty(
+            name="Extract Fill Color",
+            description="Apply Material color to Grease Pencil fills",
+            default=False,
+            )
     linestyle.use_extract_thickness = BoolProperty(
             name="Extract Thickness",
             description="Apply Freestyle thickness values to Grease Pencil strokes",
-            default=True,
+            default=False,
             )
     linestyle.use_extract_alpha = BoolProperty(
             name="Extract Alpha",
             description="Apply Freestyle alpha values to Grease Pencil strokes",
-            default=True,
+            default=False,
             )
+
     linestyle.extract_color= EnumProperty(
             name="Stroke Color Mode",
             items=(
-                ('NONE', "None", "Don't extract color"),
                 ('BASE', "Base Color", "Use the linestyle's base color"),
                 ('FIRST', "First Vertex", "Use the color of a stroke's first vertex"),
                 ('FINAL', "Final Vertex", "Use the color of a stroke's final vertex"),
@@ -393,6 +399,8 @@ def unregister():
     del bpy.types.Scene.freestyle_gpencil_export
     del bpy.types.GPencilPaletteColor.fsgpexporter
 
+    del bpy.types.FreestyleLineStyle.use_extract_color
+    del bpy.types.FreestyleLineStyle.use_extract_fill
     del bpy.types.FreestyleLineStyle.use_extract_thickness
     del bpy.types.FreestyleLineStyle.use_extract_alpha
     del bpy.types.FreestyleLineStyle.extract_color
