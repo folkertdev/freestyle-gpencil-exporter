@@ -103,10 +103,14 @@ class SVGExporterPanel(bpy.types.Panel):
 
         layout.active = (gp.use_freestyle_gpencil_export and freestyle.mode != 'SCRIPT')
 
-        row = layout.row()
+        column = layout.column()
+
+        column.label(text="Draw Mode:")
+        row = column.row()
         row.prop(gp, "draw_mode", expand=True)
 
-        row = layout.row()
+        column.label(text="Write Mode:")
+        row = column.row()
         row.prop(gp, "write_mode", expand=True)
 
 
@@ -122,11 +126,11 @@ class FSGPExporterLinesetPanel(bpy.types.Panel):
         layout = self.layout
 
         scene = context.scene
-        gp = scene.freestyle_gpencil_export
+        exporter = scene.freestyle_gpencil_export
         freestyle = scene.render.layers.active.freestyle_settings
         linestyle = freestyle.linesets.active.linestyle
 
-        layout.active = (gp.use_freestyle_gpencil_export and freestyle.mode != 'SCRIPT')
+        layout.active = (exporter.use_freestyle_gpencil_export and freestyle.mode != 'SCRIPT')
 
         col = layout.column()
         col.label(text="Extract Freestyle Settings:")
@@ -166,34 +170,22 @@ def render_external_contour():
 def create_gpencil_layer(scene, name, color, alpha, fill_color, fill_alpha):
     """Creates a new GPencil layer (if needed) to store the Freestyle result"""
 
-    try:
-        gp = bpy.data.grease_pencil.values()[0]
-    except IndexError:
-        gp = bpy.data.grease_pencil.new(name="GPencil")
+    if not scene.grease_pencil:
+        scene.grease_pencil = bpy.data.grease_pencil.new("GPencil")
 
-    scene.grease_pencil = gp
-    layer = gp.layers.get(name, False)
+
+    layer = scene.grease_pencil.layers.get(name, False)
 
     if not layer:
-        print("making new GPencil layer")
-        layer = gp.layers.new(name=name, set_active=True)
+        layer = scene.grease_pencil.layers.new(name=name, set_active=True)
 
     elif scene.freestyle_gpencil_export.write_mode == 'OVERWRITE':
         # empty the current strokes from the gp layer
         layer.clear()
 
-    """
-    elif scene.freestyle_gpencil_export.write_mode == 'OVERWRITEFRAME':
-        # empty the current strokes from the gp layer
-        print("parsed layer", layer.info[-6:],int(layer.info[-6:]), scene.frame_current)
-        if int(layer.info[-6:]) == scene.frame_current: 
-            layer.clear()
-    """
-
-
     # can this be done more neatly? layer.frames.get(..., ...) doesn't seem to work
     frame = frame_from_frame_number(layer, scene.frame_current) or layer.frames.new(scene.frame_current)
-    return layer, frame 
+    return (layer, frame)
 
 def frame_from_frame_number(layer, current_frame):
     """Get a reference to the current frame if it exists, else False"""
@@ -219,8 +211,10 @@ def get_fill_color(stroke):
 
 def get_colorname(cache, key, palette, name="FSGPencilColor"):
     code = color_to_hex(key)
+
     try:
         color = cache[code]
+        return (cache, color.name)
 
     except KeyError:
         color = palette.colors.new()
@@ -228,8 +222,7 @@ def get_colorname(cache, key, palette, name="FSGPencilColor"):
         color.color = key
         color.alpha = 1.0
         cache[code] = color
-
-    return (cache, color.name)
+        return (cache, color.name)
 
 
 def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode='3DSPACE', color_extraction='BASE'):
@@ -302,6 +295,7 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
             palette.colors.remove(color)
 
 
+
 def freestyle_to_strokes(scene, lineset):
     default = dict(color=(0, 0, 0), alpha=1, fill_color=(0, 1, 0), fill_alpha=0)
 
@@ -314,6 +308,7 @@ def freestyle_to_strokes(scene, lineset):
 
     exporter = scene.freestyle_gpencil_export
     linestyle = lineset.linestyle
+
 
     options = DrawOptions(draw_mode= exporter.draw_mode
             , color_extraction = linestyle.use_extract_color
@@ -388,7 +383,6 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.Scene.freestyle_gpencil_export = PointerProperty(type=FreestyleGPencil)
 
-    parameter_editor.callbacks_lineset_pre.append(export_fill)
     parameter_editor.callbacks_lineset_post.append(export_stroke)
     # bpy.app.handlers.render_post.append(export_stroke)
 
@@ -407,7 +401,6 @@ def unregister():
 
     del bpy.types.GPencilLayer.frame
 
-    parameter_editor.callbacks_lineset_pre.append(export_fill)
     parameter_editor.callbacks_lineset_post.remove(export_stroke)
 
 
