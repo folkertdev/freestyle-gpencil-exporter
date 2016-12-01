@@ -10,7 +10,7 @@ A tool for converting Freestyle strokes to Grease Pencil strokes.
 With the latest version, it is possible to extract styling from Freestyle strokes. 
 
 ### Render options
-<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/export_as_curve.png" /> 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/render_menu.png" align="right" /> 
 
 * **Draw mode** Draw mode for the Grease Pencil strokes
 * **Write mode** Keep adds newly generated strokes to the active GPencil layer. Overwrite first clears the 
@@ -18,7 +18,7 @@ With the latest version, it is possible to extract styling from Freestyle stroke
 
 ### Lineset options
 
-<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/export_as_curve.png" /> 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/lineset_menu.png" align="right" /> 
 
 For each lineset, this addon can extract the stroke color, thickness and alpha.
 Color can be extracted from the linestyle base color, the first vertex or the final vertex. Thickness and alpha are 
