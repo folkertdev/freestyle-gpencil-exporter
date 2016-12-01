@@ -3,7 +3,27 @@ Freestyle to GPencil
 
 <p align="center"><img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/header.png" /></p>
 
-A tool for converting the Freestyle view map (i.e. Freestyle strokes) to Grease Pencil strokes. This may be useful for inspecting how Freestyle lines are generated, or to further manipulate Freestyle strokes with Blender's excellent (and recently improved) GPencil tools. 
+A tool for converting Freestyle strokes to Grease Pencil strokes.  
+
+## Features 
+
+With the latest version, it is possible to extract styling from Freestyle strokes. 
+
+### Render options
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/export_as_curve.png" /> 
+
+* **Draw mode** Draw mode for the Grease Pencil strokes
+* **Write mode** Keep adds newly generated strokes to the active GPencil layer. Overwrite first clears the 
+    active GPencil later and then adds the newly generated strokes
+
+### Lineset options
+
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/export_as_curve.png" /> 
+
+For each lineset, this addon can extract the stroke color, thickness and alpha.
+Color can be extracted from the linestyle base color, the first vertex or the final vertex. Thickness and alpha are 
+transfered on a per-vertex basis. 
+
 
 
 ## GPencil to Curve
