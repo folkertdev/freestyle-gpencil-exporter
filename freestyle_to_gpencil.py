@@ -209,20 +209,27 @@ def get_fill_color(stroke):
     color = tuple(int(255 * c) for c in color)
 
 
-def get_colorname(cache, key, palette, name="FSGPencilColor"):
-    code = color_to_hex(key)
+def get_colorname(colors, key, palette, name="FSGPencilColor"):
 
-    try:
-        color = cache[code]
-        return (cache, color.name)
+    to_vector = lambda color: Vector((color.h, color.s, color.v))
 
-    except KeyError:
+    vectors = [ (to_vector(c.color), c) for c in colors ]
+    vector = to_vector(key)
+
+    def create_new():
         color = palette.colors.new()
         color.name = name
         color.color = key
+        color.color.s = key.s
+        color.color.v = key.v
+        color.color.h = key.h
         color.alpha = 1.0
-        cache[code] = color
-        return (cache, color.name)
+        return color
+
+    current = [color for (v, color) in vectors if  (v - vector).length < 1e-6 ]
+    result = next(iter(current), False) or create_new()
+    return result 
+
 
 
 def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode='3DSPACE', color_extraction='BASE'):
@@ -233,7 +240,8 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
     palette = grease_pencil.palettes.active or grease_pencil.palettes.new("GP_Palette")
 
     # can we tag the colors the script adds, to remove them when they are not used? 
-    cache = { color_to_hex(color.color) : color for color in palette.colors if color.fsgpexporter } 
+    cache = { color_to_hex(color.color) : color for color in palette.colors } 
+
 
     # keep track of which colors are used (to remove unused ones)
     used = []
@@ -253,7 +261,7 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
         # color has to be frozen (immutable) for it to be stored
         base_color.freeze()
 
-        (cache, colorname) = get_colorname(cache, base_color, palette) 
+        colorname = get_colorname(palette.colors, base_color, palette).name
 
         # append the current color, so it is kept
         used.append(colorname)
@@ -271,6 +279,7 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
         if options.draw_mode == '3DSPACE':
             for svert, point in zip (fstroke, gpstroke.points):
                 point.co = mat * svert.point_3d
+                # print(point.co, svert.point_3d)
 
                 if options.thickness_extraction:
                     point.pressure = sum(svert.attribute.thickness) / max(1e-6, base_width)
@@ -289,14 +298,8 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
         else:
             raise NotImplementedError()
 
-    # remove unneeded colors
-    for color in palette.colors:
-        if color.fsgpexporter and color.name not in used:
-            palette.colors.remove(color)
 
-
-
-def freestyle_to_strokes(scene, lineset):
+def freestyle_to_strokes(scene, lineset, strokes):
     default = dict(color=(0, 0, 0), alpha=1, fill_color=(0, 1, 0), fill_alpha=0)
 
     # name = "FS {} f{:06}".format(lineset.name, scene.frame_current)
@@ -304,7 +307,6 @@ def freestyle_to_strokes(scene, lineset):
     layer, frame = create_gpencil_layer(scene, name, **default)
     # render the normal strokes 
     #strokes = render_visible_strokes()
-    strokes = get_strokes()
 
     exporter = scene.freestyle_gpencil_export
     linestyle = lineset.linestyle
@@ -326,9 +328,39 @@ classes = (
     )
 
 
-def export_stroke(scene, _, lineset):
-    # create stroke layer
-    freestyle_to_strokes(scene, lineset)
+
+
+class StrokeCollector(StrokeShader):
+    def __init__(self):
+        StrokeShader.__init__(self)
+        self.viewmap = []
+
+    def shade(self, stroke):
+        self.viewmap.append(stroke)
+
+class Callbacks:
+    @classmethod
+    def poll(cls, scene, linestyle):
+        return scene.render.use_freestyle and scene.freestyle_gpencil_export.use_freestyle_gpencil_export
+
+    @classmethod
+    def modifier_post(cls, scene, layer, lineset):
+        if not cls.poll(scene, lineset.linestyle):
+            return []
+
+        cls.shader = StrokeCollector()
+        return [cls.shader]
+
+    @classmethod
+    def lineset_post(cls, scene, layer, lineset):
+        if not cls.poll(scene, lineset.linestyle):
+            return []
+
+        strokes = cls.shader.viewmap
+        freestyle_to_strokes(scene, lineset, strokes)
+
+
+
 
 
 def register():
@@ -383,8 +415,8 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.Scene.freestyle_gpencil_export = PointerProperty(type=FreestyleGPencil)
 
-    parameter_editor.callbacks_lineset_post.append(export_stroke)
-    # bpy.app.handlers.render_post.append(export_stroke)
+    parameter_editor.callbacks_modifiers_post.append(Callbacks.modifier_post)
+    parameter_editor.callbacks_lineset_post.append(Callbacks.lineset_post)
 
 def unregister():
 
@@ -401,8 +433,9 @@ def unregister():
 
     del bpy.types.GPencilLayer.frame
 
-    parameter_editor.callbacks_lineset_post.remove(export_stroke)
 
+    parameter_editor.callbacks_modifiers_post.remove(Callbacks.modifier_post)
+    parameter_editor.callbacks_lineset_post.remove(Callbacks.lineset_post)
 
 if __name__ == '__main__':
     register()
