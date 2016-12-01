@@ -1,6 +1,7 @@
 Freestyle to GPencil 
 ====================
 
+
 <p align="center"><img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/header.png" /></p>
 
 A tool for converting Freestyle strokes to Grease Pencil strokes.  
@@ -20,9 +21,13 @@ With the latest version, it is possible to extract styling from Freestyle stroke
 
 <img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/lineset_menu.png" align="right" /> 
 
-For each lineset, this addon can extract the stroke color, thickness and alpha.
-Color can be extracted from the linestyle base color, the first vertex or the final vertex. Thickness and alpha are 
-transfered on a per-vertex basis. 
+* **Extract Color** There are three possibilities for color extraction
+    - Linestyle base color 
+    - First vertex of the Freestyle stroke
+    - Final vertex of the Freestyle stroke
+* **Extract Thickness** Transfers thickness from every Freestyle vertex to every GPencil vertex
+* **Extract Alpha** Transfers alpha from every Freestyle vertex to every GPencil vertex
+
 
 
 
