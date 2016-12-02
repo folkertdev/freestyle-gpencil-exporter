@@ -288,7 +288,6 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
                     point.strength = svert.attribute.alpha
 
         elif options.draw_mode == 'SCREEN':
-            gpstroke.draw_mode = '2DSPACE'
             width, height = render_dimensions(bpy.context.scene)
             for svert, point in zip (fstroke, gpstroke.points):
                 x, y = svert.point
