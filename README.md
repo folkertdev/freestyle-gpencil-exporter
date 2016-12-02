@@ -31,11 +31,12 @@ With the latest version, it is possible to extract styling from Freestyle stroke
 The geometry is always extracted, but may give unexpected results in **3D Space** mode. The geometry modifiers 
 work on the screen (so 2D) coordinates, so their effects are not representable in **3D Space** mode.
 
-<div>
+<div style="display: block; width: 552px; margin-left: auto; margin-right: auto;">
 <img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/geometry_modifier_screen_mode.png" align="left" /> 
 <img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/geometry_modifier_3dspace_mode.png" align="right" /> 
-</div>
 <label style="margin-left:auto;margin-right:auto; width:100%">A geometry modifier in Screen (left) and 3D Space (right) mode</label>
+</div>
+
 
 
 ## GPencil to Curve
