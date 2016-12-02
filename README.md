@@ -28,7 +28,14 @@ With the latest version, it is possible to extract styling from Freestyle stroke
 * **Extract Thickness** Transfers thickness from every Freestyle vertex to every GPencil vertex
 * **Extract Alpha** Transfers alpha from every Freestyle vertex to every GPencil vertex
 
+The geometry is always extracted, but may give unexpected results in **3D Space** mode. The geometry modifiers 
+work on the screen (so 2D) coordinates, so their effects are not representable in **3D Space** mode.
 
+<div>
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/lineset_menu.png" align="left" /> 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/lineset_menu.png" align="right" /> 
+</div>
+<label style="margin-left:auto;margin-right:auto">A geometry modifier in Screen (left) and 3D Space (right) mode</label>
 
 
 ## GPencil to Curve
