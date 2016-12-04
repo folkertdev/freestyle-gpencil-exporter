@@ -35,9 +35,10 @@ work on the screen (so 2D) coordinates, so their effects are not representable i
 <img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/geometry_modifier_screen_mode.png" 
 /> 
 <img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/geometry_modifier_3dspace_mode.png"  /> 
-
-</p>
+<br>
 <label style="margin-left:auto;margin-right:auto; width:100%">A geometry modifier in Screen (left) and 3D Space (right) mode</label>
+</p>
+
 
 
 ## GPencil to Curve
