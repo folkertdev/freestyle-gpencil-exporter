@@ -271,10 +271,10 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
         gpstroke.points.add(count=len(fstroke), pressure=1, strength=1)
 
         # the max width gets pressure 1.0. Smaller widths get a pressure 0 <= x < 1 
-        base_width = functools.reduce(max, (sum(svert.attribute.thickness) for svert in fstroke)) 
+        base_width = functools.reduce(max, (sum(svert.attribute.thickness) for svert in fstroke), lineset.linestyle.thickness)
 
         # set the default (pressure == 1) width for the gpstroke
-        gpstroke.line_width = base_width 
+        gpstroke.line_width = base_width
 
         if options.draw_mode == '3DSPACE':
             for svert, point in zip (fstroke, gpstroke.points):
@@ -292,7 +292,12 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
             for svert, point in zip (fstroke, gpstroke.points):
                 x, y = svert.point
                 point.co = Vector((abs(x / width), abs(y / height), 0.0)) * 100
-                point.strength = svert.attribute.alpha
+
+                if options.thickness_extraction:
+                    point.pressure = sum(svert.attribute.thickness) / max(1e-6, base_width)
+
+                if options.alpha_extraction:
+                    point.strength = svert.attribute.alpha
 
         else:
             raise NotImplementedError()
