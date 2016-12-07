@@ -67,9 +67,12 @@ The <span>Link Strokes<span> setting (bottom row on the image) makes the extra s
 The result is a curve exactly resembling the Freestyle output. This has millions of opportunities, like creating the curve once (with Freestyle -> GPencil -> Curve) and then rendering the curve instead of Freestyle, adding particle systems (seemingly) on Freestyle strokes, exporting to other programs/formats and using all kinds of modifiers (curve, explode).
  </p>
 
+<br>
+<br>
+<br>
 
 
-### Installing 
+## Installing 
 
 This addon can be installed like any other: 
 
