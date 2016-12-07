@@ -2,7 +2,7 @@ Freestyle to GPencil
 ====================
 
 
-<p align="center"><img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/header.png" /></p>
+<p align="center"><img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/header.png" /></p>
 
 A tool for converting Freestyle strokes to Grease Pencil strokes.  
 
@@ -11,7 +11,7 @@ A tool for converting Freestyle strokes to Grease Pencil strokes.
 With the latest version, it is possible to extract styling from Freestyle strokes. 
 
 ### Render options
-<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/render_menu.png" align="right" /> 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/render_menu.png" align="right" /> 
 
 * **Draw mode** Draw mode for the Grease Pencil strokes
 * **Write mode** Keep adds newly generated strokes to the active GPencil layer. Overwrite first clears the 
@@ -21,7 +21,7 @@ With the latest version, it is possible to extract styling from Freestyle stroke
 
 ### Lineset options
 
-<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/lineset_menu.png" align="right" /> 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/lineset_menu.png" align="right" /> 
 
 * **Extract Color** There are three possibilities for color extraction
     - Linestyle base color 
@@ -34,9 +34,9 @@ With the latest version, it is possible to extract styling from Freestyle stroke
 are used and the GPencil result resembles the Freestyle result more closely. 
 
 <p align="center">
-<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/geometry_modifier_screen_mode.png" 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/geometry_modifier_screen_mode.png" 
 /> 
-<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/geometry_modifier_3dspace_mode.png"  /> 
+<img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/geometry_modifier_3dspace_mode.png"  /> 
 <br>
 <label style="margin-left:auto;margin-right:auto; width:100%">A geometry modifier in Screen (left) and 3D Space (right) mode</label>
 </p>
