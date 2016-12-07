@@ -2,7 +2,7 @@ Freestyle to GPencil
 ====================
 
 
-<p align="center"><img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/master/images/header.png" /></p>
+<p align="center"><img src ="https://rawgit.com/folkertdev/freestyle-gpencil-exporter/development/images/header.png" /></p>
 
 A tool for converting Freestyle strokes to Grease Pencil strokes.  
 
