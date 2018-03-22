@@ -7,7 +7,7 @@ from freestyle.functions import *
 import bpy
 from bpy_extras import view3d_utils
 import bpy_extras
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Color
 import functools
 import collections
 import sys
@@ -242,21 +242,21 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
     # can we tag the colors the script adds, to remove them when they are not used? 
     cache = { color_to_hex(color.color) : color for color in palette.colors } 
 
+    print(options)
 
     # keep track of which colors are used (to remove unused ones)
     used = []
 
     for fstroke in strokes:
 
+        # the color object can be "owned", so use Color to clone it
         if options.color_extraction:
             if options.color_extraction_mode == 'FIRST':
-                base_color = fstroke[0].attribute.color
+                base_color = Color(fstroke[0].attribute.color)
             elif options.color_extraction_mode == 'FINAL':
-                base_color = fstroke[-1].attribute.color
+                base_color = Color(fstroke[-1].attribute.color)
             else:
-                base_color = lineset.linestyle.color
-
-
+                base_color = Color(lineset.linestyle.color)
 
         # color has to be frozen (immutable) for it to be stored
         base_color.freeze()
