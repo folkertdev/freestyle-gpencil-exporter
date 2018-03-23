@@ -7,7 +7,7 @@ from freestyle.functions import *
 import bpy
 from bpy_extras import view3d_utils
 import bpy_extras
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Color
 import functools
 import collections
 import sys
@@ -242,21 +242,19 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
     # can we tag the colors the script adds, to remove them when they are not used? 
     cache = { color_to_hex(color.color) : color for color in palette.colors } 
 
-
     # keep track of which colors are used (to remove unused ones)
     used = []
 
     for fstroke in strokes:
 
+        # the color object can be "owned", so use Color to clone it
         if options.color_extraction:
             if options.color_extraction_mode == 'FIRST':
-                base_color = fstroke[0].attribute.color
+                base_color = Color(fstroke[0].attribute.color)
             elif options.color_extraction_mode == 'FINAL':
-                base_color = fstroke[-1].attribute.color
+                base_color = Color(fstroke[-1].attribute.color)
             else:
-                base_color = lineset.linestyle.color
-
-
+                base_color = Color(lineset.linestyle.color)
 
         # color has to be frozen (immutable) for it to be stored
         base_color.freeze()
@@ -271,10 +269,10 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
         gpstroke.points.add(count=len(fstroke), pressure=1, strength=1)
 
         # the max width gets pressure 1.0. Smaller widths get a pressure 0 <= x < 1 
-        base_width = functools.reduce(max, (sum(svert.attribute.thickness) for svert in fstroke)) 
+        base_width = functools.reduce(max, (sum(svert.attribute.thickness) for svert in fstroke), lineset.linestyle.thickness)
 
         # set the default (pressure == 1) width for the gpstroke
-        gpstroke.line_width = base_width 
+        gpstroke.line_width = base_width
 
         if options.draw_mode == '3DSPACE':
             for svert, point in zip (fstroke, gpstroke.points):
@@ -292,7 +290,12 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
             for svert, point in zip (fstroke, gpstroke.points):
                 x, y = svert.point
                 point.co = Vector((abs(x / width), abs(y / height), 0.0)) * 100
-                point.strength = svert.attribute.alpha
+
+                if options.thickness_extraction:
+                    point.pressure = sum(svert.attribute.thickness) / max(1e-6, base_width)
+
+                if options.alpha_extraction:
+                    point.strength = svert.attribute.alpha
 
         else:
             raise NotImplementedError()
