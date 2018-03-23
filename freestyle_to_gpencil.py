@@ -242,8 +242,6 @@ def freestyle_to_gpencil_strokes(strokes, frame, lineset, options): # draw_mode=
     # can we tag the colors the script adds, to remove them when they are not used? 
     cache = { color_to_hex(color.color) : color for color in palette.colors } 
 
-    print(options)
-
     # keep track of which colors are used (to remove unused ones)
     used = []
 
